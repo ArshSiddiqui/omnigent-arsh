@@ -1210,7 +1210,7 @@ def test_build_event_includes_conversation_id_none() -> None:
     assert event["context"]["conversation_id"] is None
 
 
-def test_build_event_passes_through_conversation_id() _> None:
+def test_build_event_passes_through_conversation_id() -> None:
     """
     ``_build_event`` forwards ``EvaluationContext.conversation_id``
     into ``event["context"]["conversation_id"]`` unchanged.
