@@ -35,6 +35,7 @@ import pytest
 
 from omnigent.policies.function import (
     FunctionPolicy,
+    _build_event,
     resolve_function_policy,
 )
 from omnigent.policies.types import EvaluationContext, PolicyResult
@@ -1189,3 +1190,39 @@ def test_resolve_function_policy_modern_callable_not_wrapped(tmp_path: Path) -> 
     # The shim produces an inner function named "_sync_shim" or
     # "_async_shim"; the original function is named "modern_allow".
     assert policy._callable.__name__ == "modern_allow"
+
+
+# --- _build_event forwards conversation_id ----------
+
+def test_build_event_includes_conversation_id_none() -> None:
+    """
+    ``_build_event`` includes ``conversation_id: None`` when the
+    context has none set (e.g. a hand-built test context with no
+    owning engine).
+
+    What breaks if this fails: the key is missing from the event
+    dict, causing ``KeyError`` in policy callables that check
+    ``event["context"]["conversation_id"]``.
+    """
+    ctx = EvaluationContext(phase=Phase.REQUEST, content="hello")
+    event = _build_event(ctx)
+    assert "conversation_id" in event["context"]
+    assert event["context"]["conversation_id"] is None
+
+
+def test_build_event_passes_through_conversation_id() _> None:
+    """
+    ``_build_event`` forwards ``EvaluationContext.conversation_id``
+    into ``event["context"]["conversation_id"]`` unchanged.
+
+    What breaks if this fails: a policy callable correlating an
+    event with its sessions (e.g. for a session-scoped file path or
+    log line) would see the wrong conversation, or none at all.
+    """
+    ctx = EvaluationContext(
+        phase=Phase.REQUEST,
+        content="hello",
+        conversation_id="conv_abc123",
+    )
+    event = _build_event(ctx)
+    assert event["context"]["conversation_id"] == "conv_abc123"
