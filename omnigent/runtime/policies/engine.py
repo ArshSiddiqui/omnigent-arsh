@@ -839,7 +839,7 @@ class PolicyEngine:
 
         :param ctx: Original :class:`EvaluationContext` from the
             caller.
-        :returns: A bew :class:`EvaluationContext` with
+        :returns: A new :class:`EvaluationContext` with
             ``conversation_id`` set to this engine's conversation_id.
         """
         return replace(ctx, conversation_id=self._conversation_id)
