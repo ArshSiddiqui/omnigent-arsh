@@ -1194,6 +1194,7 @@ def test_resolve_function_policy_modern_callable_not_wrapped(tmp_path: Path) -> 
 
 # --- _build_event forwards conversation_id ----------
 
+
 def test_build_event_includes_conversation_id_none() -> None:
     """
     ``_build_event`` includes ``conversation_id: None`` when the
