@@ -1227,3 +1227,58 @@ def test_build_event_passes_through_conversation_id() -> None:
     )
     event = _build_event(ctx)
     assert event["context"]["conversation_id"] == "conv_abc123"
+
+
+# --- PolicyEngine injects conversation_id ----------
+
+
+@pytest.mark.asyncio
+async def test_engine_injects_conversation_id_matching_engine_conversation(
+    conversation_store: SqlAlchemyConversationStore
+) -> None:
+    """
+    ``PolicyEngine.evaluate`` injects its own ``conversation_id``
+    into every event, even when the caller's ``EvaluationContext``
+    doesn't set one.
+
+    What breaks if this fails: policy callables would see
+    ``conversation_id: None`` for real evaluations, unable to
+    correlate the event with the session it belongs to.
+    """
+    captured: dict[str, Any] = {}
+
+    def fn(event: dict) -> PolicyResult:
+        captured["conversation_id"] = event["context"]["conversation_id"]
+        return PolicyResult(action=PolicyAction.ALLOW)
+
+    policy = FunctionPolicy(_spec(), fn)
+    engine = _build_engine(conversation_store, [policy])
+    await engine.evaluate(EvaluationContext(phase=Phase.REQUEST, content="hi"))
+    assert captured["conversation_id"] == engine._conversation_id
+    assert captured["conversation_id"] is not None
+
+
+@pytest.mark.asyncio
+async def test_engine_conversation_id_distinct_per_conversation(
+    conversation_store: SqlAlchemyConversationStore
+) -> None:
+    """
+    Two engines built for two different conversations inject two
+    different ``conversation_id`` values.
+
+    What breaks if this fails: policy callables scoping side
+    effects or logs by ``conversation_id`` would scope two
+    unrelated sessions together instead of keeping them distinct.
+    """
+    captured: list[str | None] = []
+
+    def fn(event: dict) -> PolicyResult:
+        captured.append(event["context"]["conversation_id"])
+        return PolicyResult(action=PolicyAction.ALLOW)
+
+    engine_a = _build_engine(conversation_store, [FunctionPolicy(_spec(), fn)])
+    engine_b = _build_engine(conversation_store, [FunctionPolicy(_spec(), fn)])
+    await engine_a.evaluate(EvaluationContext(phase=Phase.REQUEST, content="a"))
+    await engine_b.evaluate(EvaluationContext(phase=Phase.REQUEST, content="b"))
+    assert captured[0] != captured[1]
+    assert None not in captured
