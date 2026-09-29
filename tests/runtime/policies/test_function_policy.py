@@ -1234,7 +1234,7 @@ def test_build_event_passes_through_conversation_id() -> None:
 
 @pytest.mark.asyncio
 async def test_engine_injects_conversation_id_matching_engine_conversation(
-    conversation_store: SqlAlchemyConversationStore
+    conversation_store: SqlAlchemyConversationStore,
 ) -> None:
     """
     ``PolicyEngine.evaluate`` injects its own ``conversation_id``
@@ -1260,7 +1260,7 @@ async def test_engine_injects_conversation_id_matching_engine_conversation(
 
 @pytest.mark.asyncio
 async def test_engine_conversation_id_distinct_per_conversation(
-    conversation_store: SqlAlchemyConversationStore
+    conversation_store: SqlAlchemyConversationStore,
 ) -> None:
     """
     Two engines built for two different conversations inject two
