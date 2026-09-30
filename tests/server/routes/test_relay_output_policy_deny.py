@@ -150,8 +150,10 @@ async def test_flush_evaluates_response_phase_at_terminal() -> None:
         runner_router: Any,
         *,
         actor: Any = None,
+        turn_final: bool | None = None,
     ) -> dict[str, Any]:
         captured["text"] = body.data["content"][0]["text"]
+        captured["turn_final"] = turn_final
         return {"verdict": "deny", "reason": "output gated", "_denied_body": None}
 
     with (
@@ -168,13 +170,113 @@ async def test_flush_evaluates_response_phase_at_terminal() -> None:
             "resp_2",
             "test-agent",
             evaluate_response_phase=True,
+            turn_final=True,
         )
 
     assert captured["text"] == _DENIED_TEXT, "the policy must see the full joined text"
+    assert captured["turn_final"] is True, "the terminal flush must report turn_final=True"
     texts = _persisted_texts(store)
     assert texts == ["[Denied by policy: output gated]"], (
         f"expected the deny sentinel, got {texts!r}"
     )
+
+
+async def test_terminal_flush_evaluates_response_phase_with_no_trailing_text() -> None:
+    """
+    The terminal flush must still evaluate RESPONSE-phase policies when the
+    turn's last action was a tool call with no narration after it (an empty
+    ``text_acc``) - a once-per-turn policy needs this to run on a turn that
+    ends without trailing text.
+
+    While this bug is live, an empty buffer returns before evaluation ever
+    happens, so a once-per-turn RESPONSE policy silently never runs on any
+    turn that doesn't end with assistant narration.
+    """
+    store = _FakeConversationStore()
+    captured: dict[str, Any] = {}
+
+    async def _fake_output_policy(
+        session_id: str,
+        conv: Conversation,
+        body: Any,
+        conversation_store: Any,
+        agent_store: Any,
+        runner_router: Any,
+        *,
+        actor: Any = None,
+        turn_final: bool | None = None,
+    ) -> dict[str, Any] | None:
+        print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+        captured["called"] = True
+        captured["text"] = body.data["content"][0]["text"]
+        captured["turn_final"] = turn_final
+        return None # ALLOW
+
+    with (
+        patch(
+            "omnigent.server.routes._sessions.helpers._evaluate_output_policy",
+            _fake_output_policy,
+        ),
+        patch("omnigent.runtime._globals._agent_store", object()),
+    ):
+        await _flush_relay_text(
+            store, # type: ignore[arg-type]
+            "conv_empty_terminal",
+            [],
+            "resp_empty",
+            "test-agent",
+            evaluate_response_phase=True,
+            turn_final=True,
+        )
+
+    assert captured.get("called") is True, (
+        "the terminal flush must evaluate RESPONSE-phase policies even with "
+        "no trailing assistant text"
+    )
+    assert captured["text"] == ""
+    assert captured["turn_final"] is True
+    assert not _persisted_texts(store), "no message should persist when there's no text"
+
+
+async def test_mid_turn_empty_flush_skips_response_phase() -> None:
+    """
+    A mid-turn boundary flush with no buffered text must NOT evaluate
+    REPONSE-phase policies - only the terminal flush gets the empty-buffer
+    exception, so a once-per-turn side-effect policy fres exactly once per
+    turn, rather than at every mid-turn boundary too.
+    """
+    store = _FakeConversationStore()
+    called = False
+
+
+    async def _fake_output_policy(*args: Any, **kwargs: Any) -> dict[str | Any] | None:
+        nonlocal called
+        called = True
+        return None
+
+    with(
+        patch(
+            "omnigent.server.routes._sessions.helpers._evaluate_output_policy",
+            _fake_output_policy,
+        ),
+        patch("omnigent.runtime._globals._agent_store", object()),
+    ):
+        await _flush_relay_text(
+            store, # type: ignore[arg-type]
+            "conv_empty_midturn",
+            [],
+            "resp_empty_mid",
+            "test-agent",
+            evaluate_response_phase=True,
+            turn_final=False,
+        )
+
+    assert called is False, (
+        "an empty mid-turn boundary flush must not evaluate RESPONSE-phase "
+        "policies (that would fire a once-per-turn side effect on every "
+        "empty boundary, not just at the end of the turn)"
+    )
+
 
 
 async def test_flush_response_phase_allow_persists_unmodified() -> None:
