@@ -165,7 +165,7 @@ class EventContext(TypedDict, total=False):
         Injected by the engine, which already owns this identity.
         Read via ``event["context"]["conversation_id"]``.
     :param turn_final: On ``RESPONSE`` phase only - ``True`` when this
-        is the turn's last assistant-text segment (about ot hand
+        is the turn's last assistant-text segment (about to hand
         control back to the user), ``False`` for an earlier segment
         flushed mid-turn ahead of more tool calls, ``None`` when the
         calling path doesn't distinguish. Read via
@@ -189,7 +189,7 @@ class EventContext(TypedDict, total=False):
     # ``bool | None``: the value is ``ctx.turn_final``, populated on RESPONSE
     # phase only. ``None`` means the calling path doesn't distinguish segments
     # - policies gating on this must treat ``None`` the same as ``True``.
-    turn_final: bool
+    turn_final: bool | None
 
 
 class PolicyEvent(TypedDict, total=False):

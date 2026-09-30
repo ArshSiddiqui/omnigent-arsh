@@ -8097,10 +8097,10 @@ async def _flush_relay_text(
     :param evaluate_response_phase: When ``True`` (terminal flush), gate
         the text through the spec's RESPONSE-phase policies before
         persisting.
-    :param turn_final: Whethe rthis flush is the turn's LAST segment
+    :param turn_final: Whether this flush is the turn's LAST segment
         as opposed to an earlier mid-turn boundary flush. Forwarded to the
         policy callable as ``event["context"]["turn_final"]`` - content-gating
-        policies should ignore if and evaluate every segment, but a policy
+        policies should ignore it and evaluate every segment, but a policy
         with a once-per-turn side effect checks this to skpi acting on
         intermediate segments.
     """
@@ -8109,7 +8109,7 @@ async def _flush_relay_text(
     # the terminal flush even when the turn's last action was a tool call
     # with no trailing narration after it. There's nothing to substitute
     # a DENY into (no message will be persisted), so that outcome
-    # is logged rather than surfaced as a sentinal.
+    # is logged rather than surfaced as a sentinel.
     if not text.strip():
         if turn_final and evaluate_response_phase and conversation_store is not None:
             _empty_deny_reason = await _relay_response_policy_deny_reason(

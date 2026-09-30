@@ -242,7 +242,7 @@ def _build_event(ctx: EvaluationContext) -> PolicyEvent:
             # the engine.
             "conversation_id": ctx.conversation_id,
             # RESPONSE phase only: whether this is the turn's final
-            # assistant-text segment. None on othe rphases and on callers
+            # assistant-text segment. None on other phases and on callers
             # that don't distinguish segments.
             "turn_final": ctx.turn_final,
         },

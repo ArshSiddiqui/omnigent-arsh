@@ -247,7 +247,7 @@ async def test_mid_turn_empty_flush_skips_response_phase() -> None:
     store = _FakeConversationStore()
     called = False
 
-    async def _fake_output_policy(*args: Any, **kwargs: Any) -> dict[str | Any] | None:
+    async def _fake_output_policy(*args: Any, **kwargs: Any) -> dict[str, Any] | None:
         nonlocal called
         called = True
         return None
