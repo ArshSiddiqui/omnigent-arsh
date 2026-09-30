@@ -8111,7 +8111,7 @@ async def _flush_relay_text(
     # a DENY into (no message will be persisted), so that outcome
     # is logged rather than surfaced as a sentinal.
     if not text.strip():
-        if turn_final and evaluate_response_phase and conversation_store is None:
+        if turn_final and evaluate_response_phase and conversation_store is not None:
             _empty_deny_reason = await _relay_response_policy_deny_reason(
                 conversation_store, session_id, "", turn_final=turn_final
             )

@@ -209,7 +209,7 @@ async def test_terminal_flush_evaluates_response_phase_with_no_trailing_text() -
         captured["called"] = True
         captured["text"] = body.data["content"][0]["text"]
         captured["turn_final"] = turn_final
-        return None # ALLOW
+        return None  # ALLOW
 
     with (
         patch(
@@ -219,7 +219,7 @@ async def test_terminal_flush_evaluates_response_phase_with_no_trailing_text() -
         patch("omnigent.runtime._globals._agent_store", object()),
     ):
         await _flush_relay_text(
-            store, # type: ignore[arg-type]
+            store,  # type: ignore[arg-type]
             "conv_empty_terminal",
             [],
             "resp_empty",
@@ -253,7 +253,7 @@ async def test_mid_turn_empty_flush_skips_response_phase() -> None:
         called = True
         return None
 
-    with(
+    with (
         patch(
             "omnigent.server.routes._sessions.helpers._evaluate_output_policy",
             _fake_output_policy,
@@ -261,7 +261,7 @@ async def test_mid_turn_empty_flush_skips_response_phase() -> None:
         patch("omnigent.runtime._globals._agent_store", object()),
     ):
         await _flush_relay_text(
-            store, # type: ignore[arg-type]
+            store,  # type: ignore[arg-type]
             "conv_empty_midturn",
             [],
             "resp_empty_mid",
