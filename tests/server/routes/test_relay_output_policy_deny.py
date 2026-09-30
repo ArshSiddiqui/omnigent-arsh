@@ -206,7 +206,6 @@ async def test_terminal_flush_evaluates_response_phase_with_no_trailing_text() -
         actor: Any = None,
         turn_final: bool | None = None,
     ) -> dict[str, Any] | None:
-        print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
         captured["called"] = True
         captured["text"] = body.data["content"][0]["text"]
         captured["turn_final"] = turn_final
@@ -276,7 +275,6 @@ async def test_mid_turn_empty_flush_skips_response_phase() -> None:
         "policies (that would fire a once-per-turn side effect on every "
         "empty boundary, not just at the end of the turn)"
     )
-
 
 
 async def test_flush_response_phase_allow_persists_unmodified() -> None:
