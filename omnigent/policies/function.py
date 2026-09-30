@@ -241,6 +241,10 @@ def _build_event(ctx: EvaluationContext) -> PolicyEvent:
             # The conversation this event belongs to, injected by
             # the engine.
             "conversation_id": ctx.conversation_id,
+            # RESPONSE phase only: whether this is the turn's final
+            # assistant-text segment. None on othe rphases and on callers
+            # that don't distinguish segments.
+            "turn_final": ctx.turn_final,
         },
         # Mutable per-conversation state readable by the callable.
         # Empty dict when no policy has written state yet; the engine

@@ -7697,6 +7697,10 @@ async def _relay_runner_stream_once(
                             # call (the segment persists here, ahead of the
                             # terminal-flush evaluation).
                             evaluate_response_phase=_boundary_deny is None,
+                            # We will have more tool calls after this segment,
+                            # this isn't the final flush. Policies that run
+                            # once-per-turn should skip on these instances.
+                            turn_final=False,
                         )
                         # A failed append leaves text_acc for retry — re-arm
                         # the marker so the retry persists the sentinel.
@@ -7757,6 +7761,9 @@ async def _relay_runner_stream_once(
                             # topology can evaluate the spec's RESPONSE-phase
                             # output policies over the final assistant text.
                             evaluate_response_phase=_deny_reason is None,
+                            # This is the end of the agent's turn, policies
+                            # that run once-per-turn should act now.
+                            turn_final=True,
                         )
                         # A failed append leaves text_acc intact for a retry
                         # at a later flush — re-arm the marker so the retry

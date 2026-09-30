@@ -7948,6 +7948,8 @@ async def _relay_response_policy_deny_reason(
     conversation_store: ConversationStore,
     session_id: str,
     text: str,
+    *,
+    turn_final: bool,
 ) -> str | None:
     """
     Evaluate *text* against the session's OUTPUT (RESPONSE) phase policies.
@@ -7967,6 +7969,11 @@ async def _relay_response_policy_deny_reason(
     :param conversation_store: Store for the conversation/labels lookup.
     :param session_id: Session/conversation identifier.
     :param text: The joined assistant text segment about to persist.
+    :param turn_final: Whether `text` is the turn's last segment as opposed
+        to an earlier mid-turn boundary flush. Forwarded to the policy
+        callable as ``event["context"]["turn_final"]`` so a once-per-turn
+        side-effect policy can skip every non-final segment instead of firing
+        on each one.
     :returns: The deny reason when an output policy DENYs, else ``None``.
     """
     from omnigent.runtime._globals import _agent_store
@@ -8005,6 +8012,7 @@ async def _relay_response_policy_deny_reason(
             _agent_store,
             None,
             actor=_build_actor(turn_actor),
+            turn_final=turn_final,
         )
     except Exception:  # noqa: BLE001 — fail open: output phases are advisory on error
         _logger.exception(
@@ -8028,6 +8036,7 @@ async def _flush_relay_text(
     *,
     deny_reason: str | None = None,
     evaluate_response_phase: bool = False,
+    turn_final: bool = False,
 ) -> None:
     """
     Persist buffered assistant text as a message item and clear the buffer.
@@ -8088,11 +8097,33 @@ async def _flush_relay_text(
     :param evaluate_response_phase: When ``True`` (terminal flush), gate
         the text through the spec's RESPONSE-phase policies before
         persisting.
+    :param turn_final: Whethe rthis flush is the turn's LAST segment
+        as opposed to an earlier mid-turn boundary flush. Forwarded to the
+        policy callable as ``event["context"]["turn_final"]`` - content-gating
+        policies should ignore if and evaluate every segment, but a policy
+        with a once-per-turn side effect checks this to skpi acting on
+        intermediate segments.
     """
-    if not text_acc:
-        return
-    text = "".join(text_acc)
+    text = "".join(text_acc) if text_acc else ""
+    # Any policy that runs once-per-turn needs a chance to run at
+    # the terminal flush even when the turn's last action was a tool call
+    # with no trailing narration after it. There's nothing to substitute
+    # a DENY into (no message will be persisted), so that outcome
+    # is logged rather than surfaced as a sentinal.
     if not text.strip():
+        if turn_final and evaluate_response_phase and conversation_store is None:
+            _empty_deny_reason = await _relay_response_policy_deny_reason(
+                conversation_store, session_id, "", turn_final=turn_final
+            )
+            if _empty_deny_reason is not None:
+                _logger.warning(
+                    "Relay: terminal RESPONSE-phase policy denied an empty "
+                    "final segment for session=%s (reason=%r); no assistant "
+                    "text to substitute, so nothing is persisted",
+                    session_id,
+                    _empty_deny_reason,
+                    extra={"session_id": session_id},
+                )
         # Whitespace-only: nothing worth persisting. Drop it so it neither
         # accumulates into the next segment nor replays as an empty bubble.
         text_acc.clear()
@@ -8103,7 +8134,7 @@ async def _flush_relay_text(
         return
     if deny_reason is None and evaluate_response_phase:
         deny_reason = await _relay_response_policy_deny_reason(
-            conversation_store, session_id, text
+            conversation_store, session_id, text, turn_final=turn_final
         )
     if deny_reason is not None:
         # Substitute the sentinel for the denied content — same Option-B
@@ -8917,6 +8948,7 @@ async def _evaluate_output_policy(
     _runner_router: RunnerRouter | None,
     *,
     actor: dict[str, str] | None = None,
+    turn_final: bool | None = None,
 ) -> dict[str, Any] | None:
     """
     Evaluate an assistant message against OUTPUT phase policies.
@@ -8938,12 +8970,22 @@ async def _evaluate_output_policy(
     :param actor: Authenticated principal, e.g.
         ``{"run_as": "alice@example.com"}``. ``None`` when
         identity is unknown.
+    :param turn_final: Whether this is the turn's last assistant-text
+        segment. ``None`` from callers that only ever evaluate
+        RESPONSE once per turn. The relay's mid-turn boundary flush
+        passes ``False``; its terminal flush passes ``True``.
     :returns: ``None`` on ALLOW (fall through). Verdict dict
         with ``_denied_body`` on DENY.
     """
 
     assistant_text = _extract_assistant_text_from_event(body)
-    if not assistant_text:
+    # Skip only when there's no text AND this isn't the guaranteed
+    # once-per-turn point: a once-per-turn side-effect policy needs its
+    # one chance to run even when the turn's last action was a tool call.
+    # Content-gating policies naturally no-op on empty text, so letting
+    # evaluation through here doesn't change their behavior. ``turn_final
+    # is None`` keeps the original skip-when-empty behavior.
+    if not assistant_text and not turn_final:
         return None
 
     # Resolve the agent spec off the event loop (blocking DB + cold-cache
@@ -8963,6 +9005,7 @@ async def _evaluate_output_policy(
         content=assistant_text,
         tool_name=None,
         actor=actor,
+        turn_final=turn_final,
     )
     result = await engine.evaluate(ctx)
 
