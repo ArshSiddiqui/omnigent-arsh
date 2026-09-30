@@ -189,7 +189,7 @@ class EventContext(TypedDict, total=False):
     # ``bool | None``: the value is ``ctx.turn_final``, populated on RESPONSE
     # phase only. ``None`` means the calling path doesn't distinguish segments
     # - policies gating on this must treat ``None`` the same as ``True``.
-    turn_final: bool = False
+    turn_final: bool
 
 
 class PolicyEvent(TypedDict, total=False):
