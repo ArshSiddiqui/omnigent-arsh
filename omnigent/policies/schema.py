@@ -165,10 +165,9 @@ class EventContext(TypedDict, total=False):
         Injected by the engine, which already owns this identity.
         Read via ``event["context"]["conversation_id"]``.
     :param turn_final: On ``RESPONSE`` phase only - ``True`` when this
-        is the turn's last assistant-text segment (about to hand
-        control back to the user), ``False`` for an earlier segment
-        flushed mid-turn ahead of more tool calls, ``None`` when the
-        calling path doesn't distinguish. Read via
+        is the turn's last assistant-text segment, ``False`` for an
+        earlier segment flushed mid-turn ahead of more tool calls,
+        ``None`` when the calling path doesn't distinguish. Read via
         ``event["context"]["turn_final"]``.
     """
 

@@ -205,11 +205,11 @@ class EvaluationContext:
         to. Surfaced as ``event["context"]["conversation_id"]``.
         ``None`` only in contexts with no engine.
     :param turn_final: On ``RESPONSE`` phase only - whether this is the
-        turn's LAST assistant-text segment, about to hand control back
-        to the user, as opposed to an earlier segment flushed mid-turn
-        ahead of more tool calls. A policy with a once-per-turn side
-        effect must check this and only act when it is ``True``.
-        Surfaced as ``event["context"]["turn_final"]``. ``None`` on
+        turn's LAST assistant-text segment, as opposed to an earlier
+        segment flushed mid-turn ahead of more tool calls. A policy
+        with a once-per-turn side effect must check this and only act
+        when it is ``True``. Surfaced as
+        ``event["context"]["turn_final"]``. ``None`` on
         non-``RESPONSE`` phases and on paths that call ``RESPONSE``
         exactly once already.
     """
