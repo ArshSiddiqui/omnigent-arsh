@@ -204,14 +204,13 @@ class EvaluationContext:
     :param conversation_id: The conversation this evaluation belongs
         to. Surfaced as ``event["context"]["conversation_id"]``.
         ``None`` only in contexts with no engine.
-    :param turn_final: On ``RESPONSE`` phase only - whether this is the
-        turn's LAST assistant-text segment, as opposed to an earlier
-        segment flushed mid-turn ahead of more tool calls. A policy
-        with a once-per-turn side effect must check this and only act
-        when it is ``True``. Surfaced as
-        ``event["context"]["turn_final"]``. ``None`` on
-        non-``RESPONSE`` phases and on paths that call ``RESPONSE``
-        exactly once already.
+    :param turn_final: On ``RESPONSE``, the runner relay sets ``True`` for
+        the final text segment of a successful turn and ``False`` for
+        intermediate segments or failed, cancelled, and incomplete turns.
+        ``None`` on other phases and paths that don't distinguish; response
+        policies should skip only explicit ``False`` to preserve those
+        callers. The relay skips empty and whitespace-only segments.
+        Surfaced as ``event["context"]["turn_final"]``.
     """
 
     phase: Phase

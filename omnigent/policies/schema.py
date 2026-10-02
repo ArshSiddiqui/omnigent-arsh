@@ -186,11 +186,13 @@ class EventContext(TypedDict, total=False):
     :param conversation_id: The conversation this event belongs to.
         Injected by the engine, which already owns this identity.
         Read via ``event["context"]["conversation_id"]``.
-    :param turn_final: On ``RESPONSE`` phase only - ``True`` when this
-        is the turn's last assistant-text segment, ``False`` for an
-        earlier segment flushed mid-turn ahead of more tool calls,
-        ``None`` when the calling path doesn't distinguish. Read via
-        ``event["context"]["turn_final"]``.
+    :param turn_final: On ``RESPONSE``, the runner relay sets ``True`` for
+        the final text segment of a successful turn and ``False`` for
+        intermediate segments or failed, cancelled, and incomplete turns.
+        ``None`` on other phases and paths that don't distinguish; response
+        policies should skip only explicit ``False`` to preserve those
+        callers. The relay skips empty and whitespace-only segments.
+        Read via ``event["context"]["turn_final"]``.
     """
 
     actor: ActorContext
@@ -207,9 +209,8 @@ class EventContext(TypedDict, total=False):
     # ``str | None``: the value is ``ctx.conversation_id``, injected by the
     # engine. ``None`` only in contexts with no engine.
     conversation_id: str | None
-    # ``bool | None``: the value is ``ctx.turn_final``, populated on RESPONSE
-    # phase only. ``None`` means the calling path doesn't distinguish segments
-    # - policies gating on this must treat ``None`` the same as ``True``.
+    # RESPONSE policies skip only explicit False for completion actions;
+    # None preserves callers that do not distinguish segments.
     turn_final: bool | None
 
 

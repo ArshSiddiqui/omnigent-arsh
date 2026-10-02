@@ -8061,11 +8061,9 @@ async def _relay_response_policy_deny_reason(
 
     Runner-relayed (scaffold) harnesses never POST the assistant message
     back through ``POST /v1/sessions/{id}/events``, so the
-    ``Phase.RESPONSE`` evaluator there is unreachable for them. The relay's
-    terminal text flush is their single persist point, so this evaluates the
-    same output policies over the final assistant text right before it
-    becomes durable — making a spec's ``response``-phase policy enforceable
-    in the runner topology.
+    ``Phase.RESPONSE`` evaluator there is unreachable for them. The relay
+    evaluates these policies at each nonempty text flush, including
+    tool-call boundaries, before the segment becomes durable.
 
     Fails OPEN (returns ``None``) on any evaluation error, matching the LLM
     phases' advisory default: a policy-engine hiccup must not destroy the
@@ -8074,11 +8072,9 @@ async def _relay_response_policy_deny_reason(
     :param conversation_store: Store for the conversation/labels lookup.
     :param session_id: Session/conversation identifier.
     :param text: The joined assistant text segment about to persist.
-    :param turn_final: Whether `text` is the turn's last segment as opposed
-        to an earlier mid-turn boundary flush. Forwarded to the policy
-        callable as ``event["context"]["turn_final"]`` so a once-per-turn
-        side-effect policy can skip every non-final segment instead of firing
-        on each one.
+    :param turn_final: Whether ``text`` ends a successfully completed turn.
+        Forwarded as ``event["context"]["turn_final"]`` so completion
+        policies can skip intermediate and unsuccessful-turn segments.
     :returns: The deny reason when an output policy DENYs, else ``None``.
     """
     from omnigent.runtime._globals import _agent_store
@@ -8199,36 +8195,18 @@ async def _flush_relay_text(
     :param model_id: Assistant agent label for the message.
     :param deny_reason: When set, an output policy already denied this
         turn's assistant text; persist the deny sentinel instead of it.
-    :param evaluate_response_phase: When ``True`` (terminal flush), gate
+    :param evaluate_response_phase: When ``True``, gate
         the text through the spec's RESPONSE-phase policies before
         persisting.
-    :param turn_final: Whether this flush is the turn's LAST segment
-        as opposed to an earlier mid-turn boundary flush. Forwarded to the
-        policy callable as ``event["context"]["turn_final"]`` - content-gating
-        policies should ignore it and evaluate every segment, but a policy
-        with a once-per-turn side effect checks this to skpi acting on
-        intermediate segments.
+    :param turn_final: Whether this segment ends a successfully completed
+        turn. Completion policies can use it to skip intermediate and
+        unsuccessful-turn segments. Content policies should check every
+        segment. Empty segments never invoke policies.
     """
-    text = "".join(text_acc) if text_acc else ""
-    # Any policy that runs once-per-turn needs a chance to run at
-    # the terminal flush even when the turn's last action was a tool call
-    # with no trailing narration after it. There's nothing to substitute
-    # a DENY into (no message will be persisted), so that outcome
-    # is logged rather than surfaced as a sentinel.
+    if not text_acc:
+        return
+    text = "".join(text_acc)
     if not text.strip():
-        if turn_final and evaluate_response_phase and conversation_store is not None:
-            _empty_deny_reason = await _relay_response_policy_deny_reason(
-                conversation_store, session_id, "", turn_final=turn_final
-            )
-            if _empty_deny_reason is not None:
-                _logger.warning(
-                    "Relay: terminal RESPONSE-phase policy denied an empty "
-                    "final segment for session=%s (reason=%r); no assistant "
-                    "text to substitute, so nothing is persisted",
-                    session_id,
-                    _empty_deny_reason,
-                    extra={"session_id": session_id},
-                )
         # Whitespace-only: nothing worth persisting. Drop it so it neither
         # accumulates into the next segment nor replays as an empty bubble.
         text_acc.clear()
@@ -9075,22 +9053,15 @@ async def _evaluate_output_policy(
     :param actor: Authenticated principal, e.g.
         ``{"run_as": "alice@example.com"}``. ``None`` when
         identity is unknown.
-    :param turn_final: Whether this is the turn's last assistant-text
-        segment. ``None`` from callers that only ever evaluate
-        RESPONSE once per turn. The relay's mid-turn boundary flush
-        passes ``False``; its terminal flush passes ``True``.
+    :param turn_final: Whether this segment ends a successfully completed
+        turn. The relay passes ``False`` for intermediate or unsuccessful
+        segments. ``None`` when the calling path doesn't distinguish.
     :returns: ``None`` on ALLOW (fall through). Verdict dict
         with ``_denied_body`` on DENY.
     """
 
     assistant_text = _extract_assistant_text_from_event(body)
-    # Skip only when there's no text AND this isn't the guaranteed
-    # once-per-turn point: a once-per-turn side-effect policy needs its
-    # one chance to run even when the turn's last action was a tool call.
-    # Content-gating policies naturally no-op on empty text, so letting
-    # evaluation through here doesn't change their behavior. ``turn_final
-    # is None`` keeps the original skip-when-empty behavior.
-    if not assistant_text and not turn_final:
+    if not assistant_text:
         return None
 
     # Resolve the agent spec off the event loop (blocking DB + cold-cache
