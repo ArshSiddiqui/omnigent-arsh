@@ -10,6 +10,9 @@ the header menu), and each place is a separate entry point.
 ## Sub-features
 
 - `pin`: pinned sessions move to their own section and back.
+- `pin-reorder`: drag a pinned row onto another pinned row to change the Pinned
+  order, which persists across reloads; dropping an unpinned row onto a pinned
+  row pins it into that slot.
 - `rename`: from the row, the header menu, or the header title; long titles are
   limited.
 - `archive`: archived sessions leave the main list and appear in the archived
@@ -45,6 +48,10 @@ the header menu), and each place is a separate entry point.
 
 **Sidebar row:** hover a row and open its menu, or right-click the row. Both
 offer pin, rename, archive or unarchive, and delete.
+
+**Pinned section drag:** drag a pinned row onto another pinned row to reorder
+the Pinned section, or drop an unpinned row onto a pinned row to pin it into
+that slot.
 
 **Bulk selection:** select several rows in the sidebar, then use the selection
 actions (archive, unarchive, delete).
@@ -103,6 +110,9 @@ plain `uv run pytest`, which starts a private server for the test.
 
 - **`pin`:**
   `tests/e2e_ui/sessions/test_sidebar_pin_unpin.py::test_unpin_moves_session_back_to_recent`
+- **`pin-reorder`:**
+  `tests/e2e_ui/sessions/test_sidebar_pin_unpin.py::test_drag_reorders_pinned_sessions`.
+  Dropping an unpinned row onto a pinned row has web unit coverage only.
 - **`rename`:**
   `tests/e2e_ui/sessions/test_sidebar_rename.py::test_rename_session_enforces_user_title_limit`,
   `tests/e2e_ui/sessions/test_header_session_menu.py::test_header_session_menu_renames_owner_and_hides_for_subagent`
